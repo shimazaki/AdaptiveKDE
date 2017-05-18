@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def sshist(x, N=list(range(2, 501)), SN=30):
+def sshist(x, N=range(2, 501), SN=30):
     """
     Returns the optimal number of bins in a histogram used for density
     estimation.
@@ -57,7 +57,7 @@ def sshist(x, N=list(range(2, 501)), SN=30):
     # setup bins to evaluate
     N_MIN = 2
     N_MAX = min(np.floor((x_max - x_min) / (2*dx)), max(N))
-    N = list(range(N_MIN, N_MAX+1))
+    N = range(N_MIN, N_MAX+1)
     D = (x_max - x_min) / N
 
     # compute cost function over each possible number of bins
