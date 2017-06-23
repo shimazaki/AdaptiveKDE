@@ -147,8 +147,8 @@ def sskernel(x, tin=None, W=None, nbs=1e3):
         yb_buf = yb_buf / np.sum(yb_buf * dt)
         yb[i, ] = np.interp(tin, t, yb_buf)
     ybsort = np.sort(yb, axis=0)
-    y95b = ybsort[np.floor(0.05 * nbs), :]
-    y95u = ybsort[np.floor(0.95 * nbs), :]
+    y95b = ybsort[np.int(np.floor(0.05 * nbs)), :]
+    y95u = ybsort[np.int(np.floor(0.95 * nbs)), :]
     confb95 = np.concatenate((y95b[np.newaxis], y95u[np.newaxis]), axis=0)
 
     # return outputs
@@ -180,8 +180,8 @@ def fftkernel(x, w):
     X = np.fft.fft(x, n.astype(np.int))
 
     f = np.linspace(0, n-1, n) / n
-    f = np.concatenate((-f[0: n / 2 + 1],
-                        f[1: n / 2 - 1 + 1][::-1]))
+    f = np.concatenate((-f[0: np.int(n / 2 + 1)],
+                        f[1: np.int(n / 2 - 1 + 1)][::-1]))
 
     K = np.exp(-0.5 * (w * 2 * np.pi * f) ** 2)
 
