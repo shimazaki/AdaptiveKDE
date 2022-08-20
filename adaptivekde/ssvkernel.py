@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def ssvkernel(x, tin=None, M=80, nbs=1e2, WinFunc='Boxcar'):
+def ssvkernel(x, tin=None, M=80, nbs=100, WinFunc='Boxcar'):
     """
     Generates a locally adaptive kernel-density estimate for one-dimensional
     data.
@@ -76,7 +76,7 @@ def ssvkernel(x, tin=None, M=80, nbs=1e2, WinFunc='Boxcar'):
         T = np.max(x) - np.min(x)
         dx = np.sort(np.diff(np.sort(x)))
         dt_samp = dx[np.nonzero(dx)][0]
-        tin = np.linspace(np.min(x), np.max(x), min(np.ceil(T / dt_samp), 1e3))
+        tin = np.linspace(np.min(x), np.max(x), int(min(np.ceil(T / dt_samp), 1e3)))
         t = tin
         x_ab = x[(x >= min(tin)) & (x <= max(tin))]
     else:
@@ -85,7 +85,7 @@ def ssvkernel(x, tin=None, M=80, nbs=1e2, WinFunc='Boxcar'):
         dx = np.sort(np.diff(np.sort(x)))
         dt_samp = dx[np.nonzero(dx)][0]
         if dt_samp > min(np.diff(tin)):
-            t = np.linspace(min(tin), max(tin), min(np.ceil(T / dt_samp), 1e3))
+            t = np.linspace(min(tin), max(tin), int(min(np.ceil(T / dt_samp), 1e3)))
         else:
             t = tin
 
@@ -241,7 +241,7 @@ def fftkernel(x, w):
     X = np.fft.fft(x, n.astype(np.int))
 
     # generate kernel domain
-    f = np.linspace(0, n-1, n) / n
+    f = np.linspace(0, n-1, n.astype(np.int)) / n
     f = np.concatenate((-f[0: np.int(n / 2 + 1)],
                         f[1: np.int(n / 2 - 1 + 1)][::-1]))
 
@@ -263,7 +263,8 @@ def fftkernelWin(x, w, WinFunc):
     X = np.fft.fft(x, n.astype(np.int))
 
     # generate kernel domain
-    f = np.linspace(0, n-1, n) / n
+
+    f = np.linspace(0, n-1, n.astype(np.int)) / n
     f = np.concatenate((-f[0: np.int(n / 2 + 1)],
                         f[1: np.int(n / 2 - 1 + 1)][::-1]))
     t = 2 * np.pi * f
@@ -321,3 +322,4 @@ def ilogexp(x):
     y[x < 1e2] = np.log(np.exp(x[x < 1e2]) - 1)
     y[x >= 1e2] = x[x >= 1e2]
     return y
+    
