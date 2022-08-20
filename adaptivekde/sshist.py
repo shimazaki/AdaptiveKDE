@@ -30,6 +30,10 @@ def sshist(x, N=range(2, 501), SN=30):
     -------
     optN : int
         Optimal number of bins to represent the data in X
+    optD : double
+        Optimal width of bins
+    edges : array_like
+        Edges of optimized bins
     N : double
         Maximum number of bins to be evaluated. Default value = 500.
     C : array_like
