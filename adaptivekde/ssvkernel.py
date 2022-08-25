@@ -294,7 +294,7 @@ def Gauss(x, w):
 
 
 def Laplace(x, w):
-    y = 1 / 2**0.5 / w * np.exp(-(2**0.5) / w / np.abs(x))
+    y = 1 / 2**0.5 / w * np.exp(-(2**0.5) / w * np.abs(x))
     return y
 
 
