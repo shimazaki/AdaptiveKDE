@@ -271,8 +271,9 @@ def fftkernelWin(x, w, WinFunc):
     # determine window function - evaluate kernel
     if WinFunc == 'Boxcar':
         a = 12**0.5 * w
-        K = 2 * np.sin(a * t / 2) / (a * t)
+        K = np.zeros(len(t))
         K[0] = 1
+        K[1:] = 2 * np.sin(a * t[1:] / 2) / (a * t[1:])
     elif WinFunc == 'Laplace':
         K = 1 / (1 + (w * 2 * np.pi * f)**2 / 2)
     elif WinFunc == 'Cauchy':
