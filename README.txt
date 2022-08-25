@@ -13,7 +13,7 @@ All software in this package is licensed under the Apache License 2.0.
 See LICENSE.txt for more details.
  
 Authors:
-Hideaki Shimazaki (shimazaki@jhu.edu) shimazaki on Github
+Hideaki Shimazaki (shimazaki.hideaki.8x@kyoto-u.jp) shimazaki on Github
 Lee A.D. Cooper (cooperle@gmail.com) cooperlab on GitHub
 Subhasis Ray (ray.subhasis@gmail.com)
  
