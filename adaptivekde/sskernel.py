@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def sskernel(x, tin=None, W=None, nbs=1e3):
+def sskernel(x, tin=None, W=None, nbs=1000):
     """
     Generates a kernel density estimate with globally-optimized bandwidth.
 
@@ -60,7 +60,7 @@ def sskernel(x, tin=None, W=None, nbs=1e3):
         T = np.max(x) - np.min(x)
         dx = np.sort(np.diff(np.sort(x)))
         dt_samp = dx[np.nonzero(dx)][0]
-        tin = np.linspace(np.min(x), np.max(x), min(np.ceil(T / dt_samp), 1e3))
+        tin = np.linspace(np.min(x), np.max(x), int(min(np.ceil(T / dt_samp), 1e3)))
         t = tin
         x_ab = x[(x >= min(tin)) & (x <= max(tin))]
     else:
@@ -69,7 +69,7 @@ def sskernel(x, tin=None, W=None, nbs=1e3):
         dx = np.sort(np.diff(np.sort(x)))
         dt_samp = dx[np.nonzero(dx)][0]
         if dt_samp > min(np.diff(tin)):
-            t = np.linspace(min(tin), max(tin), min(np.ceil(T / dt_samp), 1e3))
+            t = np.linspace(min(tin), max(tin), int(min(np.ceil(T / dt_samp), 1e3)))
         else:
             t = tin
 
@@ -179,7 +179,7 @@ def fftkernel(x, w):
 
     X = np.fft.fft(x, n.astype(np.int))
 
-    f = np.linspace(0, n-1, n) / n
+    f = np.linspace(0, n-1, n.astype(np.int)) / n
     f = np.concatenate((-f[0: np.int(n / 2 + 1)],
                         f[1: np.int(n / 2 - 1 + 1)][::-1]))
 
