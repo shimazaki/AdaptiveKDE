@@ -5,6 +5,8 @@ setup(
   packages = [ "adaptivekde" ],
   version = "1.1.0",
   description = 'Optimal fixed or locally adaptive kernel density estimation',
+  long_description=open('README.txt').read(),
+  long_description_content_type='text/markdown',
   author = "Lee A.D. Cooper",
   author_email = 'cooperle@gmail.com',
   url = 'https://github.com/cooperlab/AdaptiveKDE',
