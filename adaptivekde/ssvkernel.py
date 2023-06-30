@@ -96,7 +96,7 @@ def ssvkernel(x, tin=None, M=80, nbs=100, WinFunc='Boxcar'):
     thist = np.concatenate((t, (t[-1]+dt)[np.newaxis]))
     y_hist = np.histogram(x_ab, thist-dt/2)[0] / dt
     L = y_hist.size
-    N = sum(y_hist * dt).astype(np.float)
+    N = sum(y_hist * dt).astype(float)
 
     # initialize window sizes
     W = logexp(np.linspace(ilogexp(5 * dt), ilogexp(T), M))
@@ -177,8 +177,8 @@ def ssvkernel(x, tin=None, M=80, nbs=100, WinFunc='Boxcar'):
         yb_buf = yb_buf / np.sum(yb_buf * dt)
         yb[i, :] = np.interp(tin, t, yb_buf)
     ybsort = np.sort(yb, axis=0)
-    y95b = ybsort[np.int(np.floor(0.05 * nbs)), :]
-    y95u = ybsort[np.int(np.floor(0.95 * nbs)), :]
+    y95b = ybsort[int(np.floor(0.05 * nbs)), :]
+    y95u = ybsort[int(np.floor(0.95 * nbs)), :]
     confb95 = np.concatenate((y95b[np.newaxis], y95u[np.newaxis]), axis=0)
 
     # return outputs
@@ -238,12 +238,12 @@ def fftkernel(x, w):
     L = x.size
     Lmax = L + 3 * w
     n = 2 ** np.ceil(np.log2(Lmax))
-    X = np.fft.fft(x, n.astype(np.int))
+    X = np.fft.fft(x, n.astype(int))
 
     # generate kernel domain
-    f = np.linspace(0, n-1, n.astype(np.int)) / n
-    f = np.concatenate((-f[0: np.int(n / 2 + 1)],
-                        f[1: np.int(n / 2 - 1 + 1)][::-1]))
+    f = np.linspace(0, n-1, n.astype(int)) / n
+    f = np.concatenate((-f[0: int(n / 2 + 1)],
+                        f[1: int(n / 2 - 1 + 1)][::-1]))
 
     # evaluate kernel
     K = np.exp(-0.5 * (w * 2 * np.pi * f) ** 2)
@@ -260,13 +260,13 @@ def fftkernelWin(x, w, WinFunc):
     L = x.size
     Lmax = L + 3 * w
     n = 2 ** np.ceil(np.log2(Lmax))
-    X = np.fft.fft(x, n.astype(np.int))
+    X = np.fft.fft(x, n.astype(int))
 
     # generate kernel domain
 
-    f = np.linspace(0, n-1, n.astype(np.int)) / n
-    f = np.concatenate((-f[0: np.int(n / 2 + 1)],
-                        f[1: np.int(n / 2 - 1 + 1)][::-1]))
+    f = np.linspace(0, n-1, n.astype(int)) / n
+    f = np.concatenate((-f[0: int(n / 2 + 1)],
+                        f[1: int(n / 2 - 1 + 1)][::-1]))
     t = 2 * np.pi * f
 
     # determine window function - evaluate kernel
