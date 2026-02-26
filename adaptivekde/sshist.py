@@ -56,7 +56,7 @@ def sshist(x, N=range(2, 501), SN=30):
 
     # get smallest difference 'dx' between all pairwise samples
     buf = np.abs(np.diff(np.sort(x)))
-    dx = min(buf[buf > 0])
+    dx = np.min(buf[buf > 0])
 
     # setup bins to evaluate
     N_MIN = 2

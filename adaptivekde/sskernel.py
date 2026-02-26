@@ -74,12 +74,12 @@ def sskernel(x, tin=None, W=None, nbs=1000):
             t = tin
 
     # calculate delta t
-    dt = min(np.diff(t))
+    dt = np.min(np.diff(t))
 
     # create the finest histogram
     thist = np.concatenate((t, (t[-1]+dt)[np.newaxis]))
     y_hist = np.histogram(x_ab, thist-dt/2)[0]
-    N = sum(y_hist).astype(float)
+    N = np.sum(y_hist).astype(float)
     y_hist = y_hist / N / dt
 
     # global search if input 'W' is defined

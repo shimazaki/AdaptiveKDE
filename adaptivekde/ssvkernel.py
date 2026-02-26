@@ -90,13 +90,13 @@ def ssvkernel(x, tin=None, M=80, nbs=100, WinFunc='Boxcar'):
             t = tin
 
     # calculate delta t
-    dt = min(np.diff(t))
+    dt = np.min(np.diff(t))
 
     # create the finest histogram
     thist = np.concatenate((t, (t[-1]+dt)[np.newaxis]))
     y_hist = np.histogram(x_ab, thist-dt/2)[0] / dt
     L = y_hist.size
-    N = sum(y_hist * dt).astype(float)
+    N = np.sum(y_hist * dt).astype(float)
 
     # initialize window sizes
     W = logexp(np.linspace(ilogexp(5 * dt), ilogexp(T), M))
