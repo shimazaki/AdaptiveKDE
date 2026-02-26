@@ -108,15 +108,40 @@ def ssvkernel(x, tin=None, M=80, nbs=100, WinFunc='Boxcar'):
         yh = fftkernel(y_hist, w / dt)
         c[j, :] = yh**2 - 2 * yh * y_hist + 2 / (2 * np.pi)**0.5 / w * y_hist
 
-    # initialize optimal ws
+    # initialize optimal ws — batch FFTs by grouping on padded size n
     optws = np.zeros((M, L))
-    C_local = np.empty((M, L))
+
+    # Group outer iterations by FFT size
+    fft_groups = {}
     for i in range(M):
-        Win = W[i]
-        for j in range(M):
-            C_local[j, :] = fftkernelWin(c[j, :], Win / dt, WinFunc)
-        n = np.argmin(C_local, axis=0)
-        optws[i, :] = W[n]
+        w = W[i] / dt
+        n_fft = int(2 ** np.ceil(np.log2(L + 3 * w)))
+        fft_groups.setdefault(n_fft, []).append((i, w))
+
+    for n_fft, group in fft_groups.items():
+        # Forward FFT of all c rows at this padded size — done ONCE per group
+        C_fft = np.fft.rfft(c, n_fft, axis=1)  # shape (M, n_fft//2+1)
+        f = _get_rfreq(n_fft)
+        t_freq = 2 * np.pi * f
+
+        for i, w in group:
+            # Compute window kernel for this bandwidth
+            if WinFunc == 'Boxcar':
+                a_bx = 12**0.5 * w
+                K = np.zeros(len(t_freq))
+                K[0] = 1
+                K[1:] = 2 * np.sin(a_bx * t_freq[1:] / 2) / (a_bx * t_freq[1:])
+            elif WinFunc == 'Laplace':
+                K = 1 / (1 + (w * 2 * np.pi * f)**2 / 2)
+            elif WinFunc == 'Cauchy':
+                K = np.exp(-w * np.abs(2 * np.pi * f))
+            else:
+                K = np.exp(-0.5 * (w * 2 * np.pi * f)**2)
+
+            # Batched IFFT: apply kernel to all M rows at once
+            C_local = np.fft.irfft(C_fft * K[np.newaxis, :], n_fft, axis=1)[:, :L]
+            n_idx = np.argmin(C_local, axis=0)
+            optws[i, :] = W[n_idx]
 
     # golden section search for stiffness parameter of variable bandwidths
     k = 0
