@@ -6,6 +6,7 @@ except ImportError:
     from numpy.fft import rfft, irfft, rfftfreq
 
 
+
 def ssvkernel(x, tin=None, M=80, nbs=100, WinFunc='Boxcar'):
     """
     Generates a locally adaptive kernel-density estimate for one-dimensional
@@ -401,4 +402,6 @@ def ilogexp(x):
     y[x < 1e2] = np.log(np.exp(x[x < 1e2]) - 1)
     y[x >= 1e2] = x[x >= 1e2]
     return y
+
+
     
