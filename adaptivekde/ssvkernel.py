@@ -217,38 +217,51 @@ def ssvkernel(x, tin=None, M=80, nbs=100, WinFunc='Boxcar'):
 def CostFunction(y_hist, N, t, dt, optws, WIN, WinFunc, g):
 
     L = y_hist.size
-    optwv = np.zeros((L, ))
-    for k in range(L):
-        gs = optws[:, k] / WIN
-        if g > np.max(gs):
-            optwv[k] = np.min(WIN)
-        else:
-            if g < min(gs):
-                optwv[k] = np.max(WIN)
-            else:
-                idx = np.max(np.nonzero(gs >= g))
-                optwv[k] = g * WIN[idx]
+    M = WIN.size
 
-    # Nadaraya-Watson kernel regression
-    optwp = np.zeros((L, ))
-    for k in range(L):
-        if WinFunc == 'Boxcar':
-            Z = Boxcar(t[k]-t, optwv / g)
-        elif WinFunc == 'Laplace':
-            Z = Laplace(t[k]-t, optwv / g)
-        elif WinFunc == 'Cauchy':
-            Z = Cauchy(t[k]-t, optwv / g)
-        else:  # WinFunc == 'Gauss'
-            Z = Gauss(t[k]-t, optwv / g)
-        optwp[k] = np.sum(optwv * Z) / np.sum(Z)
+    # --- vectorized optwv: replaces per-k loop ---
+    gs_all = optws / WIN[:, np.newaxis]          # (M, L)
+    gs_max = np.max(gs_all, axis=0)              # (L,)
+    gs_min = np.min(gs_all, axis=0)              # (L,)
 
-    # speed-optimized baloon estimator
+    optwv = np.full(L, np.max(WIN))              # default: g < min(gs)
+    mask_high = g > gs_max
+    optwv[mask_high] = np.min(WIN)
+    mask_mid = ~mask_high & (g >= gs_min)
+    if np.any(mask_mid):
+        ge_mask = gs_all[:, mask_mid] >= g       # (M, count)
+        row_idx = np.arange(M)[:, np.newaxis]
+        max_idx = np.max(np.where(ge_mask, row_idx, -1), axis=0)
+        optwv[mask_mid] = g * WIN[max_idx]
+
+    # --- vectorized Nadaraya-Watson kernel regression ---
+    sigma = optwv / g                            # (L,)
+    t_diff = t[:, np.newaxis] - t[np.newaxis, :] # (L, L)
+
+    if WinFunc == 'Boxcar':
+        a = 12**0.5 * sigma                      # (L,)
+        Z = np.where(np.abs(t_diff) <= a[np.newaxis, :] / 2,
+                     1 / a[np.newaxis, :], 0)
+    elif WinFunc == 'Laplace':
+        Z = (1 / 2**0.5 / sigma[np.newaxis, :]
+             * np.exp(-(2**0.5) / sigma[np.newaxis, :] * np.abs(t_diff)))
+    elif WinFunc == 'Cauchy':
+        Z = 1 / (np.pi * sigma[np.newaxis, :]
+                 * (1 + (t_diff / sigma[np.newaxis, :])**2))
+    else:  # Gauss
+        Z = (1 / (2 * np.pi)**2 / sigma[np.newaxis, :]
+             * np.exp(-t_diff**2 / 2 / sigma[np.newaxis, :]**2))
+
+    optwp = np.sum(optwv[np.newaxis, :] * Z, axis=1) / np.sum(Z, axis=1)
+
+    # --- vectorized balloon estimator ---
     idx = y_hist.nonzero()
     y_hist_nz = y_hist[idx]
     t_nz = t[idx]
-    yv = np.zeros((L, ))
-    for k in range(L):
-        yv[k] = np.sum(y_hist_nz * dt * Gauss(t[k]-t_nz, optwp[k]))
+    t_diff_nz = t[:, np.newaxis] - t_nz[np.newaxis, :]  # (L, nnz)
+    G = (1 / (2 * np.pi)**2 / optwp[:, np.newaxis]
+         * np.exp(-t_diff_nz**2 / 2 / optwp[:, np.newaxis]**2))
+    yv = np.sum(y_hist_nz[np.newaxis, :] * dt * G, axis=1)
     yv = yv * N / np.sum(yv * dt)
 
     # cost function of estimated kernel
