@@ -85,7 +85,7 @@ def sskernel(x, tin=None, W=None, nbs=1000):
     # global search if input 'W' is defined
     if W is not None:
         C = np.zeros((1, len(W)))
-        C_min = np.Inf
+        C_min = np.inf
         for k, w in enumerate(W):
             C[k], yh = CostFunction(y_hist, N, w, dt)
             if(C[k] < C_min):
