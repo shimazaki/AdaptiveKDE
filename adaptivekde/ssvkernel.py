@@ -110,9 +110,9 @@ def ssvkernel(x, tin=None, M=80, nbs=100, WinFunc='Boxcar'):
 
     # initialize optimal ws
     optws = np.zeros((M, L))
+    C_local = np.empty((M, L))
     for i in range(M):
         Win = W[i]
-        C_local = np.zeros((M, L))
         for j in range(M):
             C_local[j, :] = fftkernelWin(c[j, :], Win / dt, WinFunc)
         n = np.argmin(C_local, axis=0)
@@ -233,6 +233,18 @@ def CostFunction(y_hist, N, t, dt, optws, WIN, WinFunc, g):
     return Cg, yv, optwp
 
 
+_freq_cache = {}
+
+
+def _get_freq(n):
+    if n not in _freq_cache:
+        f = np.linspace(0, n-1, n) / n
+        f = np.concatenate((-f[0: int(n / 2 + 1)],
+                            f[1: int(n / 2 - 1 + 1)][::-1]))
+        _freq_cache[n] = f
+    return _freq_cache[n]
+
+
 def fftkernel(x, w):
     # forward padded transform
     L = x.size
@@ -240,10 +252,8 @@ def fftkernel(x, w):
     n = int(2 ** np.ceil(np.log2(Lmax)))
     X = np.fft.fft(x, n)
 
-    # generate kernel domain
-    f = np.linspace(0, n-1, n) / n
-    f = np.concatenate((-f[0: int(n / 2 + 1)],
-                        f[1: int(n / 2 - 1 + 1)][::-1]))
+    # generate kernel domain (cached)
+    f = _get_freq(n)
 
     # evaluate kernel
     K = np.exp(-0.5 * (w * 2 * np.pi * f) ** 2)
@@ -262,11 +272,8 @@ def fftkernelWin(x, w, WinFunc):
     n = int(2 ** np.ceil(np.log2(Lmax)))
     X = np.fft.fft(x, n)
 
-    # generate kernel domain
-
-    f = np.linspace(0, n-1, n) / n
-    f = np.concatenate((-f[0: int(n / 2 + 1)],
-                        f[1: int(n / 2 - 1 + 1)][::-1]))
+    # generate kernel domain (cached)
+    f = _get_freq(n)
     t = 2 * np.pi * f
 
     # determine window function - evaluate kernel
