@@ -60,7 +60,7 @@ def sshist(x, N=range(2, 501), SN=30):
 
     # setup bins to evaluate
     N_MIN = 2
-    N_MAX = min(np.floor((x_max - x_min) / (2*dx)), max(N))
+    N_MAX = int(min(np.floor((x_max - x_min) / (2*dx)), max(N)))
     N = range(N_MIN, N_MAX+1)
     D = (x_max - x_min) / N
 
