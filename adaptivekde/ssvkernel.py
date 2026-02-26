@@ -233,16 +233,13 @@ def CostFunction(y_hist, N, t, dt, optws, WIN, WinFunc, g):
     return Cg, yv, optwp
 
 
-_freq_cache = {}
+_rfreq_cache = {}
 
 
-def _get_freq(n):
-    if n not in _freq_cache:
-        f = np.linspace(0, n-1, n) / n
-        f = np.concatenate((-f[0: int(n / 2 + 1)],
-                            f[1: int(n / 2 - 1 + 1)][::-1]))
-        _freq_cache[n] = f
-    return _freq_cache[n]
+def _get_rfreq(n):
+    if n not in _rfreq_cache:
+        _rfreq_cache[n] = np.fft.rfftfreq(n)
+    return _rfreq_cache[n]
 
 
 def fftkernel(x, w):
@@ -250,16 +247,16 @@ def fftkernel(x, w):
     L = x.size
     Lmax = L + 3 * w
     n = int(2 ** np.ceil(np.log2(Lmax)))
-    X = np.fft.fft(x, n)
+    X = np.fft.rfft(x, n)
 
     # generate kernel domain (cached)
-    f = _get_freq(n)
+    f = _get_rfreq(n)
 
     # evaluate kernel
     K = np.exp(-0.5 * (w * 2 * np.pi * f) ** 2)
 
     # convolve and transform back from frequency domain
-    y = np.real(np.fft.ifft(X * K, n))
+    y = np.fft.irfft(X * K, n)
     y = y[0:L]
 
     return y
@@ -270,10 +267,10 @@ def fftkernelWin(x, w, WinFunc):
     L = x.size
     Lmax = L + 3 * w
     n = int(2 ** np.ceil(np.log2(Lmax)))
-    X = np.fft.fft(x, n)
+    X = np.fft.rfft(x, n)
 
     # generate kernel domain (cached)
-    f = _get_freq(n)
+    f = _get_rfreq(n)
     t = 2 * np.pi * f
 
     # determine window function - evaluate kernel
@@ -290,7 +287,7 @@ def fftkernelWin(x, w, WinFunc):
         K = np.exp(-0.5 * (w * 2 * np.pi * f)**2)
 
     # convolve and transform back from frequency domain
-    y = np.real(np.fft.ifft(X * K, n))
+    y = np.fft.irfft(X * K, n)
     y = y[0:L]
 
     return y

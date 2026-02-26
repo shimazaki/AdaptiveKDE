@@ -171,7 +171,7 @@ def CostFunction(y_hist, N, w, dt):
     return C, yh
 
 
-_freq_cache = {}
+_rfreq_cache = {}
 
 
 def fftkernel(x, w):
@@ -180,18 +180,15 @@ def fftkernel(x, w):
     Lmax = L + 3 * w
     n = int(2 ** np.ceil(np.log2(Lmax)))
 
-    X = np.fft.fft(x, n)
+    X = np.fft.rfft(x, n)
 
-    if n not in _freq_cache:
-        f = np.linspace(0, n-1, n) / n
-        f = np.concatenate((-f[0: int(n / 2 + 1)],
-                            f[1: int(n / 2 - 1 + 1)][::-1]))
-        _freq_cache[n] = f
-    f = _freq_cache[n]
+    if n not in _rfreq_cache:
+        _rfreq_cache[n] = np.fft.rfftfreq(n)
+    f = _rfreq_cache[n]
 
     K = np.exp(-0.5 * (w * 2 * np.pi * f) ** 2)
 
-    y = np.real(np.fft.ifft(X * K, n))
+    y = np.fft.irfft(X * K, n)
 
     y = y[0:L]
 
