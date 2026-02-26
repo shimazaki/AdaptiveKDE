@@ -6,18 +6,21 @@ Platform: carnot (2x Xeon 6258R, 754 GB RAM), Python 3.11.14, NumPy 2.4.2
 
 ## 1. Summary
 
-All three functions in AdaptiveKDE were systematically optimized using pure NumPy
-techniques (no external dependencies beyond NumPy). Every optimization preserves
+All three functions in AdaptiveKDE were systematically optimized using NumPy
+vectorization, scipy.fft, and numba JIT compilation. Every optimization preserves
 numerical correctness, verified by 18 golden reference checks at `rtol=1e-10`.
 
 | Function | Baseline (s) | Optimized (s) | Speedup |
 |---|---|---|---|
-| `sshist` | 0.194 | 0.014 | **13.6x** |
+| `sshist` | 0.194 | 0.004 | **44x** |
 | `sskernel` | 0.024 | 0.010 | **2.4x** |
 | `ssvkernel` | 0.954 | 0.070 | **13.6x** |
-| **Total** | **1.172** | **0.095** | **12.4x** |
+| **Total** | **1.172** | **0.085** | **13.8x** |
 
 CPU time (median of 20 runs, 3 warmup discarded) on 107-point Old Faithful data.
+
+Optional dependencies: `scipy` (faster FFT backend), `numba` (JIT for sshist).
+Falls back to pure NumPy when not installed (12.4x speedup without them).
 
 ## 2. Benchmark Setup
 
@@ -376,14 +379,19 @@ along the shift axis.
 | 7 | C4: vectorize bootstrap | 0.123 | 0.018 | 0.073 | 0.214 | 5.48x |
 | 8 | B2: batch bootstrap FFTs | 0.117 | 0.010 | 0.072 | 0.199 | 5.88x |
 | 9 | E2: precomp pairwise | 0.118 | 0.010 | 0.068 | 0.197 | 5.96x |
-| 10 | A3: batch shift searchsorted | 0.014 | 0.010 | 0.070 | 0.095 | **12.37x** |
+| 10 | A3: batch shift searchsorted | 0.014 | 0.010 | 0.070 | 0.095 | 12.37x |
+| 11 | B3: scipy.fft | 0.015 | 0.010 | 0.069 | 0.094 | 12.44x |
+| 12 | A2: numba JIT sshist | 0.004 | 0.010 | 0.071 | 0.085 | 13.73x |
+| 13 | C6: numba ssvkernel (no gain) | 0.004 | 0.010 | 0.070 | 0.085 | 13.80x |
+| | **final-combined** | **0.004** | **0.010** | **0.070** | **0.085** | **13.82x** |
 
 ### 4.2 n=1000 (Synthetic bimodal)
 
 | # | Optimization | sshist (s) | sskernel (s) | ssvkernel (s) | Total (s) | vs Baseline |
 |---|---|---|---|---|---|---|
 | 0 | baseline | 0.732 | 0.047 | 2.574 | 3.353 | 1.00x |
-| 10 | final (all optimizations) | 0.119 | 0.023 | 0.511 | 0.652 | **5.14x** |
+| 10 | numpy-only final | 0.119 | 0.023 | 0.511 | 0.652 | 5.14x |
+| | **final-combined** | **0.112** | **0.022** | **0.513** | **0.647** | **5.18x** |
 
 ---
 
@@ -404,28 +412,33 @@ contribution of that single optimization.
 | 8 | B2: batch bootstrap FFTs | sskernel | 0.018 → 0.010 | **1.80x** |
 | 9 | E2: precomp pairwise | ssvkernel | 0.073 → 0.068 | **1.07x** |
 | 10 | A3: batch shift searchsorted | sshist | 0.118 → 0.014 | **8.43x** |
+| 11 | B3: scipy.fft | sskernel+ssvkernel | 0.095 → 0.094 | **1.01x** (marginal) |
+| 12 | A2: numba JIT sshist | sshist | 0.014 → 0.004 | **3.27x** |
+| 13 | C6: numba ssvkernel | ssvkernel | 0.070 → 0.070 | **1.00x** (no gain) |
 
 The three largest single-step wins:
 1. **A3** (8.43x) — eliminated the 30-iteration inner Python loop in sshist
-2. **C4** (2.81x) — replaced `for k in range(L)` with L x nnz broadcasting in bootstrap
-3. **C3** (2.37x) — replaced 3 Python loops with L x L broadcasting in CostFunction
+2. **A2** (3.27x) — numba JIT compiled the entire sshist triple loop
+3. **C4** (2.81x) — replaced `for k in range(L)` with L x nnz broadcasting in bootstrap
 
 ---
 
 ## 6. Per-Function Breakdown
 
-### 6.1 `sshist`: 0.194s → 0.014s (13.6x)
+### 6.1 `sshist`: 0.194s → 0.004s (44x)
 
 The original bottleneck was a double loop: ~162 bin counts x 30 shifts = ~4860
-iterations, each calling `np.histogram`. Two optimizations addressed this:
+iterations, each calling `np.histogram`. Three optimizations addressed this:
 
 1. **A1** (1.67x): Replace `np.histogram` with `np.searchsorted` on pre-sorted
    data, eliminating redundant sorting
 2. **A3** (8.43x): Vectorize the inner 30-shift loop by constructing all edge
    arrays via broadcasting and calling `searchsorted` once per bin count
+3. **A2** (3.27x): Numba JIT compiles the entire triple loop (bins x shifts x
+   searchsorted) into native machine code, eliminating all Python overhead
 
-The outer loop over bin counts (~162 iterations) remains, but each iteration is
-now a single vectorized operation.
+With numba, the outer loop over bin counts is also compiled. The entire cost
+function computation runs as a single native function call.
 
 ### 6.2 `sskernel`: 0.024s → 0.010s (2.4x)
 
@@ -454,19 +467,84 @@ targeted three computational phases:
 
 ---
 
-## 7. Optimizations Not Applied
+## 7. Optional Dependency Results
+
+### 7.1 B3: `scipy.fft` — marginal improvement (1.01x)
+
+**Target**: `sskernel` and `ssvkernel` (all FFT calls)
+**Incremental speedup**: 1.01x total
+
+`scipy.fft` is ~23x faster per-call than `numpy.fft` in microbenchmarks.
+However, after batching optimizations (C1, B2), there are very few individual
+FFT calls remaining. The per-call speedup has almost no impact on total runtime.
+
+Both files use a fallback import pattern:
+
+```python
+try:
+    from scipy.fft import rfft, irfft, rfftfreq
+except ImportError:
+    from numpy.fft import rfft, irfft, rfftfreq
+```
+
+### 7.2 A2: Numba JIT for `sshist` — strong improvement (3.27x)
+
+**Target**: `sshist`
+**Incremental speedup**: 3.27x for sshist (0.014s → 0.004s)
+
+After vectorizing the shift loop (A3), the remaining overhead is the outer loop
+over ~162 bin counts, plus Python-level dispatch of NumPy operations per
+iteration. Numba JIT compiles the entire triple loop (bins x shifts x
+searchsorted) into a single native function:
+
+```python
+@njit(cache=True)
+def _cost(x_sorted, x_min, x_max, N_MIN, N_MAX, SN):
+    for i in range(n_range):         # bin counts
+        for p in range(SN):          # shifts
+            prev_idx = np.searchsorted(x_sorted, base)
+            for b in range(1, n+1):  # bins
+                edge = base + span * b / n
+                cur_idx = np.searchsorted(x_sorted, edge)
+                count = cur_idx - prev_idx
+                ...
+```
+
+Key implementation details:
+- Edge computation uses `base + span * b / n` to match `np.linspace` behavior
+  (avoids floating-point drift that would break golden tests at `rtol=1e-10`)
+- Uses `cache=True` for persistent compilation — first call incurs ~0.7s JIT
+  overhead, subsequent calls use the cached native code
+- Falls back to vectorized NumPy when numba is not installed
+
+### 7.3 C6: Numba JIT for `ssvkernel` CostFunction — no improvement
+
+**Target**: `ssvkernel` `CostFunction` and bootstrap
+**Incremental speedup**: 1.00x (no gain, code reverted)
+
+Numba JIT was tested for the CostFunction (replacing L x L broadcasting with
+explicit double loops) and bootstrap inner kernel. Result: identical performance
+for n=107, slightly *worse* for n=1000.
+
+**Why numba didn't help here**: The vectorized NumPy broadcasting in C3/C4
+already operates at near-optimal speed for these array sizes:
+- L x L matrix (327 x 327 = ~850 KB) fits in L2 cache
+- NumPy's BLAS-backed `exp` and matrix multiply operate at near-native speed
+- Numba's overhead from the JIT boundary and scalar `exp()` calls negated any
+  loop-fusion advantage
+- For larger arrays (L > 1000), numba might help by avoiding temporary array
+  allocation, but the current workloads don't benefit
+
+## 8. Optimizations Not Applied
 
 | ID | Optimization | Reason |
 |---|---|---|
-| A2 | Numba JIT for sshist | `numba` not installed in py311 environment |
-| C6 | Numba JIT for ssvkernel CostFunction | `numba` not installed |
-| B3 | `scipy.fft` (faster FFT backend) | `scipy` not installed |
 | E1 | Multiprocessing bootstrap | Bootstrap is only ~68ms after C4; process creation overhead would negate gains for 50 iterations at ~1ms each |
 | D1 | sum→np.sum | Applied but showed no benefit (0.97x); kept for consistency |
 
 ---
 
-## 8. Algorithmic Principles
+## 9. Algorithmic Principles
 
 The optimizations applied here follow several general principles:
 
@@ -488,3 +566,12 @@ The optimizations applied here follow several general principles:
 5. **Group by shared structure**: The M x M FFT loop has only ~3 distinct padded
    sizes. Grouping by size (C1) converts O(M^2) individual FFTs into
    O(n_groups) batched FFTs.
+
+6. **JIT compilation for irreducible loops**: When a loop cannot be vectorized
+   (sshist outer loop over variable bin counts), numba `@njit` compiles it to
+   native code. But for already-vectorized code (ssvkernel), numba provides
+   no additional benefit — vectorized NumPy is already near-optimal.
+
+7. **Diminishing returns from FFT backends**: `scipy.fft` is 23x faster
+   per-call, but after batching reduces the call count from thousands to
+   single-digits, the per-call speedup becomes irrelevant.
