@@ -1,5 +1,11 @@
 import numpy as np
 
+try:
+    from numba import njit
+    _HAS_NUMBA = True
+except ImportError:
+    _HAS_NUMBA = False
+
 
 def sshist(x, N=range(2, 501), SN=30):
     """
@@ -66,25 +72,10 @@ def sshist(x, N=range(2, 501), SN=30):
 
     # compute cost function over each possible number of bins
     x_sorted = np.sort(x)
-    Cs = np.zeros((len(N), SN))
-    for i, n in enumerate(N):  # loop over number of bins
-        shift = np.linspace(0, D[i], SN)
-        # batch all SN shifts: build (SN, n+1) edges, flatten for searchsorted
-        lo = x_min + shift - D[i] / 2       # (SN,) left edges
-        hi = x_max + shift - D[i] / 2       # (SN,) right edges
-        n_edges = N[i] + 1
-        # linspace for each shift row via broadcasting
-        frac = np.linspace(0, 1, n_edges)    # (n_edges,)
-        all_edges = lo[:, np.newaxis] + frac[np.newaxis, :] * (hi - lo)[:, np.newaxis]
-        # flatten, searchsorted, reshape, diff → counts (SN, n)
-        ss = np.searchsorted(x_sorted, all_edges.ravel())
-        counts = np.diff(ss.reshape(SN, n_edges), axis=1)  # (SN, n)
-        k = counts.mean(axis=1)              # (SN,)
-        v = np.sum((counts - k[:, np.newaxis])**2, axis=1) / N[i]
-        Cs[i, :] = (2 * k - v) / D[i]**2
-
-    # average over shift window
-    C = Cs.mean(axis=1)
+    if _HAS_NUMBA:
+        C = _sshist_cost_numba(x_sorted, x_min, x_max, N_MIN, N_MAX, SN)
+    else:
+        C = _sshist_cost_numpy(x_sorted, x_min, x_max, N, D, SN)
 
     # get bin count that minimizes cost C
     idx = np.argmin(C)
@@ -93,3 +84,61 @@ def sshist(x, N=range(2, 501), SN=30):
     edges = np.linspace(x_min, x_max, optN)
 
     return optN, optD, edges, C, N
+
+
+def _sshist_cost_numpy(x_sorted, x_min, x_max, N, D, SN):
+    """Vectorized NumPy cost computation (no numba)."""
+    Cs = np.zeros((len(N), SN))
+    for i, n in enumerate(N):
+        shift = np.linspace(0, D[i], SN)
+        lo = x_min + shift - D[i] / 2
+        hi = x_max + shift - D[i] / 2
+        n_edges = N[i] + 1
+        frac = np.linspace(0, 1, n_edges)
+        all_edges = lo[:, np.newaxis] + frac[np.newaxis, :] * (hi - lo)[:, np.newaxis]
+        ss = np.searchsorted(x_sorted, all_edges.ravel())
+        counts = np.diff(ss.reshape(SN, n_edges), axis=1)
+        k = counts.mean(axis=1)
+        v = np.sum((counts - k[:, np.newaxis])**2, axis=1) / N[i]
+        Cs[i, :] = (2 * k - v) / D[i]**2
+    return Cs.mean(axis=1)
+
+
+def _make_numba_kernel():
+    """Create numba-JIT compiled cost function (called once at import)."""
+    @njit(cache=True)
+    def _cost(x_sorted, x_min, x_max, N_MIN, N_MAX, SN):
+        T = x_max - x_min
+        n_range = N_MAX - N_MIN + 1
+        C = np.zeros(n_range)
+        for i in range(n_range):
+            n = N_MIN + i
+            D = T / n
+            cost_sum = 0.0
+            for p in range(SN):
+                sh = p * D / (SN - 1) if SN > 1 else 0.0
+                # match np.linspace edge computation exactly
+                base = x_min + sh - D / 2
+                end = x_max + sh - D / 2
+                span = end - base
+                # count events in each bin using searchsorted
+                k_sum = 0.0
+                v_sum = 0.0
+                prev_idx = np.searchsorted(x_sorted, base)
+                for b in range(1, n + 1):
+                    edge = base + span * b / n
+                    cur_idx = np.searchsorted(x_sorted, edge)
+                    count = cur_idx - prev_idx
+                    k_sum += count
+                    v_sum += count * count
+                    prev_idx = cur_idx
+                mean_k = k_sum / n
+                var = v_sum / n - mean_k * mean_k
+                cost_sum += (2 * mean_k - var) / (D * D)
+            C[i] = cost_sum / SN
+        return C
+    return _cost
+
+
+if _HAS_NUMBA:
+    _sshist_cost_numba = _make_numba_kernel()
