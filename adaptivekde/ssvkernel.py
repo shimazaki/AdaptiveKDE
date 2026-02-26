@@ -1,5 +1,10 @@
 import numpy as np
 
+try:
+    from scipy.fft import rfft, irfft, rfftfreq
+except ImportError:
+    from numpy.fft import rfft, irfft, rfftfreq
+
 
 def ssvkernel(x, tin=None, M=80, nbs=100, WinFunc='Boxcar'):
     """
@@ -120,7 +125,7 @@ def ssvkernel(x, tin=None, M=80, nbs=100, WinFunc='Boxcar'):
 
     for n_fft, group in fft_groups.items():
         # Forward FFT of all c rows at this padded size — done ONCE per group
-        C_fft = np.fft.rfft(c, n_fft, axis=1)  # shape (M, n_fft//2+1)
+        C_fft = rfft(c, n_fft, axis=1)  # shape (M, n_fft//2+1)
         f = _get_rfreq(n_fft)
         t_freq = 2 * np.pi * f
 
@@ -139,7 +144,7 @@ def ssvkernel(x, tin=None, M=80, nbs=100, WinFunc='Boxcar'):
                 K = np.exp(-0.5 * (w * 2 * np.pi * f)**2)
 
             # Batched IFFT: apply kernel to all M rows at once
-            C_local = np.fft.irfft(C_fft * K[np.newaxis, :], n_fft, axis=1)[:, :L]
+            C_local = irfft(C_fft * K[np.newaxis, :], n_fft, axis=1)[:, :L]
             n_idx = np.argmin(C_local, axis=0)
             optws[i, :] = W[n_idx]
 
@@ -307,7 +312,7 @@ _rfreq_cache = {}
 
 def _get_rfreq(n):
     if n not in _rfreq_cache:
-        _rfreq_cache[n] = np.fft.rfftfreq(n)
+        _rfreq_cache[n] = rfftfreq(n)
     return _rfreq_cache[n]
 
 
@@ -316,7 +321,7 @@ def fftkernel(x, w):
     L = x.size
     Lmax = L + 3 * w
     n = int(2 ** np.ceil(np.log2(Lmax)))
-    X = np.fft.rfft(x, n)
+    X = rfft(x, n)
 
     # generate kernel domain (cached)
     f = _get_rfreq(n)
@@ -325,7 +330,7 @@ def fftkernel(x, w):
     K = np.exp(-0.5 * (w * 2 * np.pi * f) ** 2)
 
     # convolve and transform back from frequency domain
-    y = np.fft.irfft(X * K, n)
+    y = irfft(X * K, n)
     y = y[0:L]
 
     return y
@@ -336,7 +341,7 @@ def fftkernelWin(x, w, WinFunc):
     L = x.size
     Lmax = L + 3 * w
     n = int(2 ** np.ceil(np.log2(Lmax)))
-    X = np.fft.rfft(x, n)
+    X = rfft(x, n)
 
     # generate kernel domain (cached)
     f = _get_rfreq(n)
@@ -356,7 +361,7 @@ def fftkernelWin(x, w, WinFunc):
         K = np.exp(-0.5 * (w * 2 * np.pi * f)**2)
 
     # convolve and transform back from frequency domain
-    y = np.fft.irfft(X * K, n)
+    y = irfft(X * K, n)
     y = y[0:L]
 
     return y

@@ -1,5 +1,10 @@
 import numpy as np
 
+try:
+    from scipy.fft import rfft, irfft, rfftfreq
+except ImportError:
+    from numpy.fft import rfft, irfft, rfftfreq
+
 
 def sskernel(x, tin=None, W=None, nbs=1000):
     """
@@ -151,12 +156,12 @@ def sskernel(x, tin=None, W=None, nbs=1000):
     # batched FFT convolution (single 2D rfft instead of nbs individual calls)
     w = optw / dt
     n = int(2 ** np.ceil(np.log2(L + 3 * w)))
-    Y_all = np.fft.rfft(y_all, n, axis=1)
+    Y_all = rfft(y_all, n, axis=1)
     if n not in _rfreq_cache:
-        _rfreq_cache[n] = np.fft.rfftfreq(n)
+        _rfreq_cache[n] = rfftfreq(n)
     f = _rfreq_cache[n]
     K = np.exp(-0.5 * (w * 2 * np.pi * f)**2)
-    yb_conv = np.fft.irfft(Y_all * K[np.newaxis, :], n, axis=1)[:, :L]
+    yb_conv = irfft(Y_all * K[np.newaxis, :], n, axis=1)[:, :L]
 
     # normalize and interpolate
     norms = np.sum(yb_conv * dt, axis=1, keepdims=True)
@@ -198,15 +203,15 @@ def fftkernel(x, w):
     Lmax = L + 3 * w
     n = int(2 ** np.ceil(np.log2(Lmax)))
 
-    X = np.fft.rfft(x, n)
+    X = rfft(x, n)
 
     if n not in _rfreq_cache:
-        _rfreq_cache[n] = np.fft.rfftfreq(n)
+        _rfreq_cache[n] = rfftfreq(n)
     f = _rfreq_cache[n]
 
     K = np.exp(-0.5 * (w * 2 * np.pi * f) ** 2)
 
-    y = np.fft.irfft(X * K, n)
+    y = irfft(X * K, n)
 
     y = y[0:L]
 
