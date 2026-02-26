@@ -79,7 +79,7 @@ def sskernel(x, tin=None, W=None, nbs=1000):
     # create the finest histogram
     thist = np.concatenate((t, (t[-1]+dt)[np.newaxis]))
     y_hist = np.histogram(x_ab, thist-dt/2)[0]
-    N = sum(y_hist).astype(np.float)
+    N = sum(y_hist).astype(float)
     y_hist = y_hist / N / dt
 
     # global search if input 'W' is defined
@@ -147,8 +147,8 @@ def sskernel(x, tin=None, W=None, nbs=1000):
         yb_buf = yb_buf / np.sum(yb_buf * dt)
         yb[i, ] = np.interp(tin, t, yb_buf)
     ybsort = np.sort(yb, axis=0)
-    y95b = ybsort[np.int(np.floor(0.05 * nbs)), :]
-    y95u = ybsort[np.int(np.floor(0.95 * nbs)), :]
+    y95b = ybsort[int(np.floor(0.05 * nbs)), :]
+    y95u = ybsort[int(np.floor(0.95 * nbs)), :]
     confb95 = np.concatenate((y95b[np.newaxis], y95u[np.newaxis]), axis=0)
 
     # return outputs
@@ -177,11 +177,11 @@ def fftkernel(x, w):
     Lmax = L + 3 * w
     n = 2 ** np.ceil(np.log2(Lmax))
 
-    X = np.fft.fft(x, n.astype(np.int))
+    X = np.fft.fft(x, n.astype(int))
 
-    f = np.linspace(0, n-1, n.astype(np.int)) / n
-    f = np.concatenate((-f[0: np.int(n / 2 + 1)],
-                        f[1: np.int(n / 2 - 1 + 1)][::-1]))
+    f = np.linspace(0, n-1, n.astype(int)) / n
+    f = np.concatenate((-f[0: int(n / 2 + 1)],
+                        f[1: int(n / 2 - 1 + 1)][::-1]))
 
     K = np.exp(-0.5 * (w * 2 * np.pi * f) ** 2)
 
