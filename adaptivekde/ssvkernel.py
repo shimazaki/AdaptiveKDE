@@ -187,18 +187,23 @@ def ssvkernel(x, tin=None, M=80, nbs=100, WinFunc='Boxcar'):
     # estimate confidence intervals by bootstrapping
     nbs = np.asarray(nbs)
     yb = np.zeros((nbs, tin.size))
+    thist = np.concatenate((t, (t[-1]+dt)[np.newaxis]))
+    bins = thist - dt / 2
+    inv_2pi2 = 1 / (2 * np.pi)**2
+    optw_sq2 = 2 * optw**2                       # pre-compute for Gauss
     for i in range(nbs):
         Nb = np.random.poisson(lam=N)
         idx = np.random.randint(0, N, Nb)
         xb = x_ab[idx]
-        thist = np.concatenate((t, (t[-1]+dt)[np.newaxis]))
-        y_histb = np.histogram(xb, thist - dt / 2)[0]
-        idx = y_histb.nonzero()
-        y_histb_nz = y_histb[idx]
-        t_nz = t[idx]
-        yb_buf = np.zeros((L, ))
-        for k in range(L):
-            yb_buf[k] = np.sum(y_histb_nz * Gauss(t[k] - t_nz, optw[k])) / Nb
+        y_histb = np.histogram(xb, bins)[0]
+        idx_nz = y_histb.nonzero()
+        y_histb_nz = y_histb[idx_nz]
+        t_nz = t[idx_nz]
+        # vectorized L×nnz balloon estimator
+        t_diff_nz = t[:, np.newaxis] - t_nz[np.newaxis, :]
+        G = (inv_2pi2 / optw[:, np.newaxis]
+             * np.exp(-t_diff_nz**2 / optw_sq2[:, np.newaxis]))
+        yb_buf = np.sum(y_histb_nz[np.newaxis, :] * G, axis=1) / Nb
         yb_buf = yb_buf / np.sum(yb_buf * dt)
         yb[i, :] = np.interp(tin, t, yb_buf)
     ybsort = np.sort(yb, axis=0)
