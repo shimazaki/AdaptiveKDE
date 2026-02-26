@@ -237,11 +237,11 @@ def fftkernel(x, w):
     # forward padded transform
     L = x.size
     Lmax = L + 3 * w
-    n = 2 ** np.ceil(np.log2(Lmax))
-    X = np.fft.fft(x, n.astype(int))
+    n = int(2 ** np.ceil(np.log2(Lmax)))
+    X = np.fft.fft(x, n)
 
     # generate kernel domain
-    f = np.linspace(0, n-1, n.astype(int)) / n
+    f = np.linspace(0, n-1, n) / n
     f = np.concatenate((-f[0: int(n / 2 + 1)],
                         f[1: int(n / 2 - 1 + 1)][::-1]))
 
@@ -259,12 +259,12 @@ def fftkernelWin(x, w, WinFunc):
     # forward padded transform
     L = x.size
     Lmax = L + 3 * w
-    n = 2 ** np.ceil(np.log2(Lmax))
-    X = np.fft.fft(x, n.astype(int))
+    n = int(2 ** np.ceil(np.log2(Lmax)))
+    X = np.fft.fft(x, n)
 
     # generate kernel domain
 
-    f = np.linspace(0, n-1, n.astype(int)) / n
+    f = np.linspace(0, n-1, n) / n
     f = np.concatenate((-f[0: int(n / 2 + 1)],
                         f[1: int(n / 2 - 1 + 1)][::-1]))
     t = 2 * np.pi * f
