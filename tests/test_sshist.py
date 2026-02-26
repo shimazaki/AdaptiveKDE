@@ -1,4 +1,5 @@
 import os
+import time
 import numpy as np
 import pytest
 from adaptivekde.sshist import sshist
@@ -8,7 +9,12 @@ class TestSshistGolden:
     """Compare sshist output against saved reference data."""
 
     def test_golden_match(self, faithful, ref_dir):
+        t0_wall = time.perf_counter()
+        t0_cpu = time.process_time()
         optN, optD, edges, C, N = sshist(faithful)
+        wall = time.perf_counter() - t0_wall
+        cpu = time.process_time() - t0_cpu
+        print(f"\n  sshist: {wall:.4f} s (cpu: {cpu:.4f} s)")
         ref = np.load(os.path.join(ref_dir, "sshist_ref.npz"))
 
         assert optN == int(ref["optN"])

@@ -1,4 +1,5 @@
 import os
+import time
 import numpy as np
 import pytest
 from adaptivekde.sskernel import sskernel
@@ -9,7 +10,12 @@ class TestSskernelGolden:
 
     def test_golden_match(self, faithful, ref_dir):
         np.random.seed(0)
+        t0_wall = time.perf_counter()
+        t0_cpu = time.process_time()
         y, t, optw, W, C, confb95, yb = sskernel(faithful, nbs=200)
+        wall = time.perf_counter() - t0_wall
+        cpu = time.process_time() - t0_cpu
+        print(f"\n  sskernel: {wall:.4f} s (cpu: {cpu:.4f} s)")
         ref = np.load(os.path.join(ref_dir, "sskernel_ref.npz"))
 
         np.testing.assert_allclose(y, ref["y"], rtol=1e-10)

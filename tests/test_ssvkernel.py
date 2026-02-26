@@ -1,4 +1,5 @@
 import os
+import time
 import numpy as np
 import pytest
 from adaptivekde.ssvkernel import ssvkernel
@@ -9,7 +10,12 @@ class TestSsvkernelGolden:
 
     def test_golden_match(self, faithful, ref_dir):
         np.random.seed(0)
+        t0_wall = time.perf_counter()
+        t0_cpu = time.process_time()
         y, t, optw, gs, C, confb95, yb = ssvkernel(faithful, nbs=50)
+        wall = time.perf_counter() - t0_wall
+        cpu = time.process_time() - t0_cpu
+        print(f"\n  ssvkernel: {wall:.4f} s (cpu: {cpu:.4f} s)")
         ref = np.load(os.path.join(ref_dir, "ssvkernel_ref.npz"))
 
         np.testing.assert_allclose(y, ref["y"], rtol=1e-10)
