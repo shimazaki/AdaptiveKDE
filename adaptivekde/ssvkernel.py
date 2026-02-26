@@ -143,6 +143,20 @@ def ssvkernel(x, tin=None, M=80, nbs=100, WinFunc='Boxcar'):
             n_idx = np.argmin(C_local, axis=0)
             optws[i, :] = W[n_idx]
 
+    # pre-compute invariants for CostFunction (reused ~30 times)
+    idx_nz = y_hist.nonzero()
+    precomp = {
+        't_diff': t[:, np.newaxis] - t[np.newaxis, :],           # (L, L)
+        't_diff_nz': t[:, np.newaxis] - t[idx_nz][np.newaxis, :], # (L, nnz)
+        'gs_all': optws / W[:, np.newaxis],                       # (M, L)
+        'y_hist_nz': y_hist[idx_nz],
+        'WIN_min': np.min(W),
+        'WIN_max': np.max(W),
+        'row_idx': np.arange(M)[:, np.newaxis],
+    }
+    precomp['gs_max'] = np.max(precomp['gs_all'], axis=0)
+    precomp['gs_min'] = np.min(precomp['gs_all'], axis=0)
+
     # golden section search for stiffness parameter of variable bandwidths
     k = 0
     gs = np.zeros((30, 1))
@@ -153,8 +167,8 @@ def ssvkernel(x, tin=None, M=80, nbs=100, WinFunc='Boxcar'):
     phi = (5**0.5 + 1) / 2
     c1 = (phi - 1) * a + (2 - phi) * b
     c2 = (2 - phi) * a + (phi - 1) * b
-    f1 = CostFunction(y_hist, N, t, dt, optws, W, WinFunc, c1)[0]
-    f2 = CostFunction(y_hist, N, t, dt, optws, W, WinFunc, c2)[0]
+    f1 = CostFunction(y_hist, N, t, dt, optws, W, WinFunc, c1, precomp)[0]
+    f2 = CostFunction(y_hist, N, t, dt, optws, W, WinFunc, c2, precomp)[0]
     while (np.abs(b-a) > tol * (abs(c1) + abs(c2))) & (k < 30):
         if f1 < f2:
             b = c2
@@ -162,7 +176,7 @@ def ssvkernel(x, tin=None, M=80, nbs=100, WinFunc='Boxcar'):
             c1 = (phi - 1) * a + (2 - phi) * b
             f2 = f1
             f1, yv1, optwp1 = CostFunction(y_hist, N, t, dt, optws, W,
-                                           WinFunc, c1)
+                                           WinFunc, c1, precomp)
             yopt = yv1 / np.sum(yv1 * dt)
             optw = optwp1
         else:
@@ -171,7 +185,7 @@ def ssvkernel(x, tin=None, M=80, nbs=100, WinFunc='Boxcar'):
             c2 = (2 - phi) * a + (phi - 1) * b
             f1 = f2
             f2, yv2, optwp2 = CostFunction(y_hist, N, t, dt, optws, W,
-                                           WinFunc, c2)
+                                           WinFunc, c2, precomp)
             yopt = yv2 / np.sum(yv2 * dt)
             optw = optwp2
 
@@ -219,32 +233,48 @@ def ssvkernel(x, tin=None, M=80, nbs=100, WinFunc='Boxcar'):
     return y, t, optw, gs, C, confb95, yb
 
 
-def CostFunction(y_hist, N, t, dt, optws, WIN, WinFunc, g):
+def CostFunction(y_hist, N, t, dt, optws, WIN, WinFunc, g, precomp=None):
 
     L = y_hist.size
-    M = WIN.size
 
-    # --- vectorized optwv: replaces per-k loop ---
-    gs_all = optws / WIN[:, np.newaxis]          # (M, L)
-    gs_max = np.max(gs_all, axis=0)              # (L,)
-    gs_min = np.min(gs_all, axis=0)              # (L,)
+    if precomp is not None:
+        gs_all = precomp['gs_all']
+        gs_max = precomp['gs_max']
+        gs_min = precomp['gs_min']
+        t_diff = precomp['t_diff']
+        t_diff_nz = precomp['t_diff_nz']
+        y_hist_nz = precomp['y_hist_nz']
+        WIN_min = precomp['WIN_min']
+        WIN_max = precomp['WIN_max']
+        row_idx = precomp['row_idx']
+    else:
+        M = WIN.size
+        gs_all = optws / WIN[:, np.newaxis]
+        gs_max = np.max(gs_all, axis=0)
+        gs_min = np.min(gs_all, axis=0)
+        t_diff = t[:, np.newaxis] - t[np.newaxis, :]
+        idx_nz = y_hist.nonzero()
+        t_diff_nz = t[:, np.newaxis] - t[idx_nz][np.newaxis, :]
+        y_hist_nz = y_hist[idx_nz]
+        WIN_min = np.min(WIN)
+        WIN_max = np.max(WIN)
+        row_idx = np.arange(M)[:, np.newaxis]
 
-    optwv = np.full(L, np.max(WIN))              # default: g < min(gs)
+    # --- vectorized optwv ---
+    optwv = np.full(L, WIN_max)                  # default: g < min(gs)
     mask_high = g > gs_max
-    optwv[mask_high] = np.min(WIN)
+    optwv[mask_high] = WIN_min
     mask_mid = ~mask_high & (g >= gs_min)
     if np.any(mask_mid):
-        ge_mask = gs_all[:, mask_mid] >= g       # (M, count)
-        row_idx = np.arange(M)[:, np.newaxis]
+        ge_mask = gs_all[:, mask_mid] >= g
         max_idx = np.max(np.where(ge_mask, row_idx, -1), axis=0)
         optwv[mask_mid] = g * WIN[max_idx]
 
     # --- vectorized Nadaraya-Watson kernel regression ---
-    sigma = optwv / g                            # (L,)
-    t_diff = t[:, np.newaxis] - t[np.newaxis, :] # (L, L)
+    sigma = optwv / g
 
     if WinFunc == 'Boxcar':
-        a = 12**0.5 * sigma                      # (L,)
+        a = 12**0.5 * sigma
         Z = np.where(np.abs(t_diff) <= a[np.newaxis, :] / 2,
                      1 / a[np.newaxis, :], 0)
     elif WinFunc == 'Laplace':
@@ -260,10 +290,6 @@ def CostFunction(y_hist, N, t, dt, optws, WIN, WinFunc, g):
     optwp = np.sum(optwv[np.newaxis, :] * Z, axis=1) / np.sum(Z, axis=1)
 
     # --- vectorized balloon estimator ---
-    idx = y_hist.nonzero()
-    y_hist_nz = y_hist[idx]
-    t_nz = t[idx]
-    t_diff_nz = t[:, np.newaxis] - t_nz[np.newaxis, :]  # (L, nnz)
     G = (1 / (2 * np.pi)**2 / optwp[:, np.newaxis]
          * np.exp(-t_diff_nz**2 / 2 / optwp[:, np.newaxis]**2))
     yv = np.sum(y_hist_nz[np.newaxis, :] * dt * G, axis=1)
