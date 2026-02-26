@@ -137,15 +137,33 @@ def sskernel(x, tin=None, W=None, nbs=1000):
 
     # estimate confidence intervals by bootstrapping
     nbs = np.asarray(nbs)
-    yb = np.zeros((nbs, len(tin)))
+    L = len(t)
+    thist = np.concatenate((t, (t[-1]+dt)[np.newaxis]))
+    bins = thist - dt / 2
+
+    # generate all bootstrap histograms
+    y_all = np.zeros((nbs, L))
     for i in range(nbs):
         idx = np.random.randint(0, len(x_ab)-1, len(x_ab))
         xb = x_ab[idx]
-        thist = np.concatenate((t, (t[-1]+dt)[np.newaxis]))
-        y_histb = np.histogram(xb, thist - dt / 2)[0] / dt / N
-        yb_buf = fftkernel(y_histb, optw / dt)
-        yb_buf = yb_buf / np.sum(yb_buf * dt)
-        yb[i, ] = np.interp(tin, t, yb_buf)
+        y_all[i, :] = np.histogram(xb, bins)[0] / dt / N
+
+    # batched FFT convolution (single 2D rfft instead of nbs individual calls)
+    w = optw / dt
+    n = int(2 ** np.ceil(np.log2(L + 3 * w)))
+    Y_all = np.fft.rfft(y_all, n, axis=1)
+    if n not in _rfreq_cache:
+        _rfreq_cache[n] = np.fft.rfftfreq(n)
+    f = _rfreq_cache[n]
+    K = np.exp(-0.5 * (w * 2 * np.pi * f)**2)
+    yb_conv = np.fft.irfft(Y_all * K[np.newaxis, :], n, axis=1)[:, :L]
+
+    # normalize and interpolate
+    norms = np.sum(yb_conv * dt, axis=1, keepdims=True)
+    yb_conv = yb_conv / norms
+    yb = np.zeros((nbs, len(tin)))
+    for i in range(nbs):
+        yb[i, :] = np.interp(tin, t, yb_conv[i, :])
     ybsort = np.sort(yb, axis=0)
     y95b = ybsort[int(np.floor(0.05 * nbs)), :]
     y95u = ybsort[int(np.floor(0.95 * nbs)), :]
