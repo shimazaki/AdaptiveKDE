@@ -69,19 +69,19 @@ def sshist(x, N=range(2, 501), SN=30):
     Cs = np.zeros((len(N), SN))
     for i, n in enumerate(N):  # loop over number of bins
         shift = np.linspace(0, D[i], SN)
-        for p, sh in enumerate(shift):  # loop over shift window positions
-
-            # define bin edges (same computation as original)
-            edges = np.linspace(x_min + sh - D[i]/2,
-                                x_max + sh - D[i]/2, N[i]+1)
-
-            # count events using searchsorted on pre-sorted data
-            counts = np.diff(np.searchsorted(x_sorted, edges))
-
-            k = counts.mean()
-            v = np.sum((counts - k)**2) / N[i]
-
-            Cs[i, p] = (2*k - v) / D[i]**2
+        # batch all SN shifts: build (SN, n+1) edges, flatten for searchsorted
+        lo = x_min + shift - D[i] / 2       # (SN,) left edges
+        hi = x_max + shift - D[i] / 2       # (SN,) right edges
+        n_edges = N[i] + 1
+        # linspace for each shift row via broadcasting
+        frac = np.linspace(0, 1, n_edges)    # (n_edges,)
+        all_edges = lo[:, np.newaxis] + frac[np.newaxis, :] * (hi - lo)[:, np.newaxis]
+        # flatten, searchsorted, reshape, diff → counts (SN, n)
+        ss = np.searchsorted(x_sorted, all_edges.ravel())
+        counts = np.diff(ss.reshape(SN, n_edges), axis=1)  # (SN, n)
+        k = counts.mean(axis=1)              # (SN,)
+        v = np.sum((counts - k[:, np.newaxis])**2, axis=1) / N[i]
+        Cs[i, :] = (2 * k - v) / D[i]**2
 
     # average over shift window
     C = Cs.mean(axis=1)
