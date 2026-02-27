@@ -28,6 +28,19 @@ bandwidth.
 
 3. ssvkernel - implements kernel density estimation with a locally variable bandwidth.
 
+Classic (original) implementations:
+Each function also has a _classic variant that preserves the original, unoptimized
+reference implementation. These have identical signatures and return values:
+
+  from adaptivekde import sshist_classic, sskernel_classic, ssvkernel_classic
+
+Or import from the classic subpackage:
+
+  from adaptivekde.classic import sshist_classic
+
+The optimized versions (sshist, sskernel, ssvkernel) are the default and recommended
+for normal use. The _classic variants are provided for reference and reproducibility.
+
 Requirements:
   Python >= 3.9
   NumPy >= 1.24
