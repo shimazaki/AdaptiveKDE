@@ -98,7 +98,7 @@ def sskernel(x, tin=None, W=None, nbs=1000):
         W = np.zeros((20, 1))
         Wmin = 2*dt
         Wmax = (np.max(x) - np.min(x))
-        tol = 10e-5
+        tol = 1e-5
         phi = (5**0.5 + 1) / 2
         a = ilogexp(Wmin)
         b = ilogexp(Wmax)
