@@ -139,7 +139,7 @@ def sskernel(x, tin=None, W=None, nbs=1000):
     nbs = np.asarray(nbs)
     yb = np.zeros((nbs, len(tin)))
     for i in range(nbs):
-        idx = np.random.randint(0, len(x_ab)-1, len(x_ab))
+        idx = np.random.randint(0, len(x_ab), len(x_ab))
         xb = x_ab[idx]
         thist = np.concatenate((t, (t[-1]+dt)[np.newaxis]))
         y_histb = np.histogram(xb, thist - dt / 2)[0] / dt / N
