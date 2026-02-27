@@ -22,6 +22,30 @@ CPU time (median of 20 runs, 3 warmup discarded) on 107-point Old Faithful data.
 Optional dependencies: `scipy` (faster FFT backend), `numba` (JIT for sshist).
 Falls back to pure NumPy when not installed (12.4x speedup without them).
 
+### Applied optimizations at a glance
+
+**`sshist`** (44x):
+- Replace `np.histogram` with `np.searchsorted` on pre-sorted data for bin counting
+- Vectorize the inner shift-averaging loop (SN=30) via broadcasting into a single flattened `searchsorted` call per bin count
+- Numba `@njit` compiled double loop for the entire cost computation (optional, falls back to NumPy)
+
+**`sskernel`** (2.4x):
+- Cache FFT frequency vectors by size to avoid recomputation
+- Batch all 1000 bootstrap histograms into a single 2D `rfft`/`irfft` instead of 1000 individual `fftkernel` calls
+- Use `scipy.fft` when available (optional, falls back to `numpy.fft`)
+
+**`ssvkernel`** (13.6x):
+- Batch FFTs in the M×M bandwidth-selection loop: group by padded FFT size (~3 distinct values), forward-FFT once per group, reducing ~6400 individual FFTs to ~83 batched calls
+- Cache frequency vectors and pre-allocate the cost matrix outside the outer loop
+- Vectorize 3 Python `for k in range(L)` loops in `CostFunction` with NumPy broadcasting: optwv selection via masked arrays, Nadaraya-Watson regression via L×L pairwise kernel matrix, balloon estimator via L×nnz kernel matrix
+- Vectorize the bootstrap inner loop with L×nnz broadcasting and hoist invariants out of the loop
+- Pre-compute pairwise distance matrices (L×L, L×nnz) once before the golden section loop, reused ~27 times
+- Use `scipy.fft` when available (optional, falls back to `numpy.fft`)
+
+**Cross-cutting** (all files):
+- Replace Python `sum()`/`min()` with `np.sum()`/`np.min()`
+- Use real-valued FFT (`rfft`/`irfft`) instead of complex FFT — half the frequency array, ~2x faster per call
+
 ## 2. Benchmark Setup
 
 - **Metric**: CPU time via `time.process_time()` (excludes I/O wait, measures
