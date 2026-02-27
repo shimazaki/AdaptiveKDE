@@ -575,3 +575,94 @@ The optimizations applied here follow several general principles:
 7. **Diminishing returns from FFT backends**: `scipy.fft` is 23x faster
    per-call, but after batching reduces the call count from thousands to
    single-digits, the per-call speedup becomes irrelevant.
+
+---
+
+## 10. Computational Complexity
+
+### The grid resolution parameter L
+
+All three functions operate on an internal evaluation grid of `L` points, not
+directly on the raw samples. `L` is determined by data resolution:
+
+```python
+L = int(min(np.ceil(T / dt_samp), 1e3))
+```
+
+where `T = max(x) - min(x)` is the data range and `dt_samp` is the smallest
+nonzero gap between consecutive sorted samples. The hardcoded cap of `1e3`
+limits `L` to at most 1000 grid points.
+
+**L depends on data resolution, not on sample count n.** For example:
+
+| Dataset | n | dt_samp | T / dt_samp | L |
+|---|---|---|---|---|
+| Old Faithful (107 pts) | 107 | 0.01 | 326 | 327 |
+| 10,000 pts rounded to 2 decimals | 10,000 | 0.01 | ~326 | 327 |
+| 10,000 pts at full precision | 10,000 | ~3e-4 | ~10,000 | **1000** (capped) |
+
+For high-precision data with many samples, `L` saturates at 1000. This means
+the O(L^2) operations in CostFunction become a constant cost, and overall
+scaling becomes linear in n.
+
+### Complexity by function
+
+#### `sshist`
+
+| Phase | Operation | Complexity |
+|---|---|---|
+| Sort data | `np.sort(x)` | O(n log n) |
+| Outer loop | N_MAX bin counts | N_MAX = min(T / 2dx, 500) |
+| Inner (vectorized) | SN × n_bins searchsorted queries on n points | O(SN × n_bins × log n) |
+| **Total** | sum over bin counts | **O(N_MAX^2 × log n + n log n)** |
+
+N_MAX is capped at `max(N)` = 500 by default. For well-resolved data with
+small dx, N_MAX can grow proportional to n until hitting the cap:
+
+- **n < ~1000**: O(n^2 log n) — N_MAX grows with n
+- **n > ~1000**: O(n log n) — N_MAX capped, sort dominates
+
+#### `sskernel`
+
+| Phase | Operation | Complexity |
+|---|---|---|
+| Setup (sort, histogram) | | O(n log n) |
+| Golden section search | ~20 iterations × fftkernel | O(20 × L log L) |
+| Bootstrap (dominant) | nbs × (histogram + FFT) | O(nbs × (n + L log L)) |
+| **Total** | | **O(nbs × n + nbs × L log L)** |
+
+The bootstrap histogram generation O(nbs × n) dominates for large n. With
+L capped at 1000 and the default nbs = 1000:
+
+- **n < 1000**: O(nbs × n log n) — L ≈ n, FFT phase matters
+- **n > 1000**: O(nbs × n) — linear in n
+
+#### `ssvkernel`
+
+| Phase | Operation | Complexity |
+|---|---|---|
+| Local cost (M FFTs) | M = 80 fftkernel calls | O(M × L log L) |
+| M×M bandwidth selection | batched FFTs by group | O(M^2 × L log L) |
+| CostFunction (×~27) | L×L Nadaraya-Watson + L×nnz balloon | O(27 × L^2) |
+| Bootstrap (dominant) | nbs × (histogram + L×nnz kernel + interp) | O(nbs × (n + L × nnz)) |
+| **Total** | | **O(nbs × (n + L^2) + M^2 × L log L)** |
+
+Here nnz (nonzero histogram bins) satisfies nnz ≤ L. The L×L pairwise
+kernel matrix in CostFunction and the L×nnz bootstrap kernel are the most
+expensive operations:
+
+- **n < 1000**: L ≈ n → **O(nbs × n^2)** — quadratic in n
+- **n > 1000**: L = 1000 → **O(nbs × n)** — linear in n (L^2 becomes constant)
+
+### Summary table
+
+| Function | n < 1000 (L ≈ n) | n > 1000 (L = 1000) | Dominant operation |
+|---|---|---|---|
+| `sshist` | O(n^2 log n) | O(n log n) | searchsorted loop |
+| `sskernel` | O(nbs × n log n) | O(nbs × n) | bootstrap histograms |
+| `ssvkernel` | O(nbs × n^2) | O(nbs × n) | CostFunction L×L matrix |
+
+The L = 1000 cap is the key scaling boundary. Below it, `ssvkernel` scales
+quadratically; above it, all functions scale linearly in n. For applications
+with very large n, the bottleneck shifts from kernel evaluation to bootstrap
+resampling (generating histograms from resampled data).
