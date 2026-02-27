@@ -9,7 +9,7 @@ setup(
   long_description_content_type='text/markdown',
   author = "Lee A.D. Cooper",
   author_email = 'cooperle@gmail.com',
-  url = 'https://github.com/cooperlab/AdaptiveKDE',
+  url = 'https://github.com/shimazaki/AdaptiveKDE',
   python_requires='>=3.9',
   install_requires=['numpy>=1.24'],
   classifiers = ['Development Status :: 5 - Production/Stable',
