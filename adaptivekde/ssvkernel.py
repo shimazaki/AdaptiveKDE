@@ -290,7 +290,7 @@ def fftkernelWin(x, w, WinFunc):
 
 
 def Gauss(x, w):
-    y = 1 / (2 * np.pi)**2 / w * np.exp(-x**2 / 2 / w**2)
+    y = 1 / (2 * np.pi)**0.5 / w * np.exp(-x**2 / 2 / w**2)
     return y
 
 
