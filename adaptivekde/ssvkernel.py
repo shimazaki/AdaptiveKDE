@@ -80,9 +80,9 @@ def ssvkernel(x, tin=None, M=80, nbs=100, WinFunc='Boxcar'):
         t = tin
         x_ab = x[(x >= min(tin)) & (x <= max(tin))]
     else:
-        T = np.max(x) - np.min(x)
+        T = np.max(tin) - np.min(tin)
         x_ab = x[(x >= min(tin)) & (x <= max(tin))]
-        dx = np.sort(np.diff(np.sort(x)))
+        dx = np.sort(np.diff(np.sort(x_ab)))
         dt_samp = dx[np.nonzero(dx)][0]
         if dt_samp > min(np.diff(tin)):
             t = np.linspace(min(tin), max(tin), int(min(np.ceil(T / dt_samp), 1e3)))
