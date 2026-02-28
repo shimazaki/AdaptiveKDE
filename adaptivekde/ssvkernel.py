@@ -86,9 +86,9 @@ def ssvkernel(x, tin=None, M=80, nbs=100, WinFunc='Boxcar'):
         t = tin
         x_ab = x[(x >= min(tin)) & (x <= max(tin))]
     else:
-        T = np.max(x) - np.min(x)
+        T = np.max(tin) - np.min(tin)
         x_ab = x[(x >= min(tin)) & (x <= max(tin))]
-        dx = np.sort(np.diff(np.sort(x)))
+        dx = np.sort(np.diff(np.sort(x_ab)))
         dt_samp = dx[np.nonzero(dx)][0]
         if dt_samp > min(np.diff(tin)):
             t = np.linspace(min(tin), max(tin), int(min(np.ceil(T / dt_samp), 1e3)))
@@ -209,7 +209,7 @@ def ssvkernel(x, tin=None, M=80, nbs=100, WinFunc='Boxcar'):
     yb = np.zeros((nbs, tin.size))
     thist = np.concatenate((t, (t[-1]+dt)[np.newaxis]))
     bins = thist - dt / 2
-    inv_2pi2 = 1 / (2 * np.pi)**2
+    inv_2pi2 = 1 / (2 * np.pi)**0.5
     optw_sq2 = 2 * optw**2                       # pre-compute for Gauss
     for i in range(nbs):
         Nb = np.random.poisson(lam=N)
@@ -290,13 +290,13 @@ def CostFunction(y_hist, N, t, dt, optws, WIN, WinFunc, g, precomp=None):
         Z = 1 / (np.pi * sigma[np.newaxis, :]
                  * (1 + (t_diff / sigma[np.newaxis, :])**2))
     else:  # Gauss
-        Z = (1 / (2 * np.pi)**2 / sigma[np.newaxis, :]
+        Z = (1 / (2 * np.pi)**0.5 / sigma[np.newaxis, :]
              * np.exp(-t_diff**2 / 2 / sigma[np.newaxis, :]**2))
 
     optwp = np.sum(optwv[np.newaxis, :] * Z, axis=1) / np.sum(Z, axis=1)
 
     # --- vectorized balloon estimator ---
-    G = (1 / (2 * np.pi)**2 / optwp[:, np.newaxis]
+    G = (1 / (2 * np.pi)**0.5 / optwp[:, np.newaxis]
          * np.exp(-t_diff_nz**2 / 2 / optwp[:, np.newaxis]**2))
     yv = np.sum(y_hist_nz[np.newaxis, :] * dt * G, axis=1)
     yv = yv * N / np.sum(yv * dt)
@@ -369,7 +369,7 @@ def fftkernelWin(x, w, WinFunc):
 
 
 def Gauss(x, w):
-    y = 1 / (2 * np.pi)**2 / w * np.exp(-x**2 / 2 / w**2)
+    y = 1 / (2 * np.pi)**0.5 / w * np.exp(-x**2 / 2 / w**2)
     return y
 
 

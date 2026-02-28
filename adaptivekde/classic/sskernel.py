@@ -64,9 +64,9 @@ def sskernel_classic(x, tin=None, W=None, nbs=1000):
         t = tin
         x_ab = x[(x >= min(tin)) & (x <= max(tin))]
     else:
-        T = np.max(x) - np.min(x)
+        T = np.max(tin) - np.min(tin)
         x_ab = x[(x >= min(tin)) & (x <= max(tin))]
-        dx = np.sort(np.diff(np.sort(x)))
+        dx = np.sort(np.diff(np.sort(x_ab)))
         dt_samp = dx[np.nonzero(dx)][0]
         if dt_samp > min(np.diff(tin)):
             t = np.linspace(min(tin), max(tin), int(min(np.ceil(T / dt_samp), 1e3)))
@@ -98,7 +98,7 @@ def sskernel_classic(x, tin=None, W=None, nbs=1000):
         W = np.zeros((20, 1))
         Wmin = 2*dt
         Wmax = (np.max(x) - np.min(x))
-        tol = 10e-5
+        tol = 1e-5
         phi = (5**0.5 + 1) / 2
         a = ilogexp(Wmin)
         b = ilogexp(Wmax)
@@ -139,7 +139,7 @@ def sskernel_classic(x, tin=None, W=None, nbs=1000):
     nbs = np.asarray(nbs)
     yb = np.zeros((nbs, len(tin)))
     for i in range(nbs):
-        idx = np.random.randint(0, len(x_ab)-1, len(x_ab))
+        idx = np.random.randint(0, len(x_ab), len(x_ab))
         xb = x_ab[idx]
         thist = np.concatenate((t, (t[-1]+dt)[np.newaxis]))
         y_histb = np.histogram(xb, thist - dt / 2)[0] / dt / N

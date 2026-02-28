@@ -69,9 +69,9 @@ def sskernel(x, tin=None, W=None, nbs=1000):
         t = tin
         x_ab = x[(x >= min(tin)) & (x <= max(tin))]
     else:
-        T = np.max(x) - np.min(x)
+        T = np.max(tin) - np.min(tin)
         x_ab = x[(x >= min(tin)) & (x <= max(tin))]
-        dx = np.sort(np.diff(np.sort(x)))
+        dx = np.sort(np.diff(np.sort(x_ab)))
         dt_samp = dx[np.nonzero(dx)][0]
         if dt_samp > min(np.diff(tin)):
             t = np.linspace(min(tin), max(tin), int(min(np.ceil(T / dt_samp), 1e3)))
@@ -103,7 +103,7 @@ def sskernel(x, tin=None, W=None, nbs=1000):
         W = np.zeros((20, 1))
         Wmin = 2*dt
         Wmax = (np.max(x) - np.min(x))
-        tol = 10e-5
+        tol = 1e-5
         phi = (5**0.5 + 1) / 2
         a = ilogexp(Wmin)
         b = ilogexp(Wmax)
@@ -149,7 +149,7 @@ def sskernel(x, tin=None, W=None, nbs=1000):
     # generate all bootstrap histograms
     y_all = np.zeros((nbs, L))
     for i in range(nbs):
-        idx = np.random.randint(0, len(x_ab)-1, len(x_ab))
+        idx = np.random.randint(0, len(x_ab), len(x_ab))
         xb = x_ab[idx]
         y_all[i, :] = np.histogram(xb, bins)[0] / dt / N
 

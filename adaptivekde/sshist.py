@@ -81,7 +81,7 @@ def sshist(x, N=range(2, 501), SN=30):
     idx = np.argmin(C)
     optN = N[idx]
     optD = D[idx]
-    edges = np.linspace(x_min, x_max, optN)
+    edges = np.linspace(x_min, x_max, optN + 1)
 
     return optN, optD, edges, C, N
 
